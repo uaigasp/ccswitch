@@ -18,6 +18,16 @@ func (f fakeUsageFetcher) Fetch(accessToken string) (float64, error) {
 	return f.byToken[accessToken], nil
 }
 
+type countingUsageFetcher struct {
+	byToken map[string]float64
+	calls   int
+}
+
+func (f *countingUsageFetcher) Fetch(accessToken string) (float64, error) {
+	f.calls++
+	return f.byToken[accessToken], nil
+}
+
 func TestRunOnceDryRunDoesNotWriteCredentials(t *testing.T) {
 	dir := t.TempDir()
 
@@ -110,5 +120,106 @@ func TestRunOnceAppliesSwapWhenNotDryRun(t *testing.T) {
 	}
 	if accessToken != "tok-b" {
 		t.Fatalf("credentials should have tok-b, got %q", accessToken)
+	}
+}
+
+func TestRunOnceSkipsCandidateFetchWhenBelowThreshold(t *testing.T) {
+	dir := t.TempDir()
+
+	store := accounts.Store{
+		Active: "principal",
+		Accounts: []accounts.Account{
+			{Alias: "principal", OAuth: accounts.OAuthData{AccessToken: "tok-a"}},
+			{Alias: "secundaria", OAuth: accounts.OAuthData{AccessToken: "tok-b"}},
+		},
+	}
+	accounts.Save(dir, store)
+
+	fetcher := &countingUsageFetcher{byToken: map[string]float64{"tok-a": 50, "tok-b": 10}}
+	cfg := config.Config{ThresholdPercent: 90, CooldownSeconds: 300}
+
+	decision, _, err := runOnceWithFetcher(dir, fetcher, cfg, time.Time{}, false)
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if decision.ShouldSwitch {
+		t.Fatalf("no deberia cambiar por debajo del threshold, got %+v", decision)
+	}
+	if fetcher.calls != 1 {
+		t.Fatalf("solo deberia haber consultado la cuenta activa, calls=%d", fetcher.calls)
+	}
+}
+
+func TestRunOnceSkipsCandidateFetchDuringCooldown(t *testing.T) {
+	dir := t.TempDir()
+
+	store := accounts.Store{
+		Active: "principal",
+		Accounts: []accounts.Account{
+			{Alias: "principal", OAuth: accounts.OAuthData{AccessToken: "tok-a"}},
+			{Alias: "secundaria", OAuth: accounts.OAuthData{AccessToken: "tok-b"}},
+		},
+	}
+	accounts.Save(dir, store)
+
+	fetcher := &countingUsageFetcher{byToken: map[string]float64{"tok-a": 95, "tok-b": 10}}
+	cfg := config.Config{ThresholdPercent: 90, CooldownSeconds: 300}
+
+	decision, _, err := runOnceWithFetcher(dir, fetcher, cfg, time.Now().Add(-1*time.Minute), false)
+	if err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+	if decision.ShouldSwitch {
+		t.Fatalf("no deberia cambiar dentro del cooldown, got %+v", decision)
+	}
+	if fetcher.calls != 1 {
+		t.Fatalf("solo deberia haber consultado la cuenta activa, calls=%d", fetcher.calls)
+	}
+}
+
+func TestRunOnceSavesBackActiveAccountLiveCredentials(t *testing.T) {
+	dir := t.TempDir()
+	credPath := t.TempDir() + "/credentials.json"
+
+	credentialsContent := map[string]interface{}{
+		"claudeAiOauth": map[string]string{
+			"accessToken": "tok-a-live",
+		},
+	}
+	credentialsData, err := json.Marshal(credentialsContent)
+	if err != nil {
+		t.Fatalf("error marshaling credentials: %v", err)
+	}
+	if err := os.WriteFile(credPath, credentialsData, 0o600); err != nil {
+		t.Fatalf("error writing credentials file: %v", err)
+	}
+
+	store := accounts.Store{
+		Active: "principal",
+		Accounts: []accounts.Account{
+			{Alias: "principal", OAuth: accounts.OAuthData{AccessToken: "tok-a"}},
+			{Alias: "secundaria", OAuth: accounts.OAuthData{AccessToken: "tok-b"}},
+		},
+	}
+	accounts.Save(dir, store)
+
+	fetcher := fakeUsageFetcher{byToken: map[string]float64{"tok-a": 95, "tok-b": 10}}
+	cfg := config.Config{ThresholdPercent: 90, CooldownSeconds: 300}
+
+	if _, err := doRunOnce(dir, credPath, fetcher, cfg, time.Time{}, false); err != nil {
+		t.Fatalf("error inesperado: %v", err)
+	}
+
+	after, err := accounts.Load(dir)
+	if err != nil {
+		t.Fatalf("load fallo: %v", err)
+	}
+
+	principal, ok := after.Get("principal")
+	if !ok {
+		t.Fatal("esperaba encontrar la cuenta principal")
+	}
+	if principal.OAuth.AccessToken != "tok-a-live" {
+		t.Fatalf("deberia haber guardado el token en vivo antes de sobreescribir, got %q", principal.OAuth.AccessToken)
 	}
 }

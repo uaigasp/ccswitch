@@ -43,6 +43,18 @@ func doRunOnce(dir, credPath string, fetcher usageFetcher, cfg config.Config, la
 		if !ok {
 			return decision, fmt.Errorf("la cuenta %q ya no existe en el store", decision.TargetAlias)
 		}
+
+		if store.Active != "" {
+			if live, err := swap.ReadActive(credPath); err == nil {
+				for i := range store.Accounts {
+					if store.Accounts[i].Alias == store.Active {
+						store.Accounts[i].OAuth = live
+						break
+					}
+				}
+			}
+		}
+
 		if err := swap.WriteActive(credPath, target.OAuth); err != nil {
 			return decision, err
 		}
@@ -75,6 +87,14 @@ func runOnceWithFetcher(dir string, fetcher usageFetcher, cfg config.Config, las
 		return autoswitch.Decision{}, accounts.Store{}, err
 	}
 
+	now := time.Now()
+	if now.Sub(lastSwitch) < time.Duration(cfg.CooldownSeconds)*time.Second {
+		return autoswitch.Decision{}, store, nil
+	}
+	if activePct < float64(cfg.ThresholdPercent) {
+		return autoswitch.Decision{}, store, nil
+	}
+
 	candidates := map[string]float64{}
 	for _, a := range store.Accounts {
 		if a.Alias == store.Active {
@@ -87,5 +107,5 @@ func runOnceWithFetcher(dir string, fetcher usageFetcher, cfg config.Config, las
 		candidates[a.Alias] = pct
 	}
 
-	return autoswitch.Evaluate(activePct, candidates, cfg.ThresholdPercent, lastSwitch, time.Now(), cfg.CooldownSeconds), store, nil
+	return autoswitch.Evaluate(activePct, candidates, cfg.ThresholdPercent, lastSwitch, now, cfg.CooldownSeconds), store, nil
 }
