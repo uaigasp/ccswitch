@@ -44,6 +44,29 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("cambiado a:", alias)
+	case "service":
+		if len(args) == 0 {
+			fmt.Fprintln(os.Stderr, "uso: ccswitch service <install|uninstall|status|run>")
+			os.Exit(1)
+		}
+		var err error
+		switch args[0] {
+		case "install":
+			err = runServiceInstall()
+		case "uninstall":
+			err = runServiceUninstall()
+		case "status":
+			err = runServiceStatus()
+		case "run":
+			err = runServiceRun()
+		default:
+			fmt.Fprintln(os.Stderr, "subcomando desconocido:", args[0])
+			os.Exit(1)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "comando desconocido: %s\n", cmd)
 		printUsage()
