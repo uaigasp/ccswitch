@@ -34,6 +34,16 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+	case "switch":
+		var alias string
+		if len(args) > 0 {
+			alias = args[0]
+		}
+		if err := runSwitch(alias); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		fmt.Println("cambiado a:", alias)
 	default:
 		fmt.Fprintf(os.Stderr, "comando desconocido: %s\n", cmd)
 		printUsage()

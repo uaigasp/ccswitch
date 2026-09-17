@@ -117,6 +117,39 @@ func runStatus() error {
 	return nil
 }
 
+func runSwitch(alias string) error {
+	if alias == "" {
+		return fmt.Errorf("hace falta indicar el alias. uso: ccswitch switch <alias>")
+	}
+
+	dir, err := appDataDir()
+	if err != nil {
+		return err
+	}
+
+	store, err := accounts.Load(dir)
+	if err != nil {
+		return err
+	}
+
+	target, ok := store.Get(alias)
+	if !ok {
+		return fmt.Errorf("no existe una cuenta con alias %q", alias)
+	}
+
+	credPath, err := swap.DefaultCredentialsPath()
+	if err != nil {
+		return err
+	}
+
+	if err := swap.WriteActive(credPath, target.OAuth); err != nil {
+		return fmt.Errorf("no se pudo escribir las credenciales: %w", err)
+	}
+
+	store.Active = alias
+	return accounts.Save(dir, store)
+}
+
 func parseAddFlags(args []string) (alias, email string) {
 	for i := 0; i < len(args)-1; i++ {
 		switch args[i] {
