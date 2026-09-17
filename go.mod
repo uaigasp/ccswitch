@@ -1,6 +1,6 @@
 module github.com/uaigasp/ccswitch
 
-go 1.26.5
+go 1.23.0
 
 require github.com/kardianos/service v1.3.0
 
