@@ -23,6 +23,7 @@ ccswitch add --alias principal --email vos@ejemplo.com    agrega la cuenta logue
 ccswitch list                                              lista las cuentas y su uso
 ccswitch status                                             muestra la cuenta activa
 ccswitch switch secundaria                                   cambia de cuenta a mano
+ccswitch auto --once --dry-run                                simula un ciclo de auto-switch sin tocar archivos reales
 ccswitch service install                                      instala el auto-switch (correr como admin)
 ccswitch service status                                       dice si esta corriendo
 ccswitch service uninstall                                    lo saca

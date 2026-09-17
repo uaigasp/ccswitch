@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/uaigasp/ccswitch/internal/accounts"
+	"github.com/uaigasp/ccswitch/internal/config"
+	"github.com/uaigasp/ccswitch/internal/serviceloop"
 	"github.com/uaigasp/ccswitch/internal/swap"
 	"github.com/uaigasp/ccswitch/internal/usage"
 )
@@ -142,12 +145,60 @@ func runSwitch(alias string) error {
 		return err
 	}
 
+	if store.Active != "" {
+		if live, err := swap.ReadActive(credPath); err == nil {
+			if current, ok := store.Get(store.Active); ok {
+				current.OAuth = live
+				for i := range store.Accounts {
+					if store.Accounts[i].Alias == store.Active {
+						store.Accounts[i] = current
+						break
+					}
+				}
+			}
+		}
+	}
+
 	if err := swap.WriteActive(credPath, target.OAuth); err != nil {
 		return fmt.Errorf("no se pudo escribir las credenciales: %w", err)
 	}
 
 	store.Active = alias
 	return accounts.Save(dir, store)
+}
+
+func runAuto(dryRun bool) error {
+	dir, err := appDataDir()
+	if err != nil {
+		return err
+	}
+
+	credPath, err := swap.DefaultCredentialsPath()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+
+	decision, err := serviceloop.RunOnce(dir, credPath, cfg, time.Time{}, dryRun)
+	if err != nil {
+		return err
+	}
+
+	if !decision.ShouldSwitch {
+		fmt.Println("no hay nada para cambiar")
+		return nil
+	}
+
+	if dryRun {
+		fmt.Println("cambiaria a:", decision.TargetAlias, "(dry-run)")
+	} else {
+		fmt.Println("cambiado a:", decision.TargetAlias)
+	}
+	return nil
 }
 
 func parseAddFlags(args []string) (alias, email string) {

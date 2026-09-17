@@ -44,6 +44,17 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("cambiado a:", alias)
+	case "auto":
+		dryRun := false
+		for _, a := range args {
+			if a == "--dry-run" {
+				dryRun = true
+			}
+		}
+		if err := runAuto(dryRun); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	case "service":
 		if len(args) == 0 {
 			fmt.Fprintln(os.Stderr, "uso: ccswitch service <install|uninstall|status|run>")
@@ -58,7 +69,7 @@ func main() {
 		case "status":
 			err = runServiceStatus()
 		case "run":
-			err = runServiceRun()
+			err = runServiceRun(args[1:])
 		default:
 			fmt.Fprintln(os.Stderr, "subcomando desconocido:", args[0])
 			os.Exit(1)
@@ -82,6 +93,7 @@ Comandos:
   list                lista las cuentas guardadas
   status               muestra la cuenta activa y su uso
   switch <alias>       cambia a otra cuenta guardada
+  auto --once --dry-run  simula un ciclo de auto-switch sin tocar archivos reales
   service install       instala el servicio de auto-switch
   service uninstall     lo desinstala
   service status         dice si esta corriendo`)
