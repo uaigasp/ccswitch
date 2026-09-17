@@ -17,12 +17,28 @@ func main() {
 	switch cmd {
 	case "help", "-h", "--help":
 		printUsage()
+	case "add":
+		alias, email := parseAddFlags(args)
+		if err := runAdd(alias, email); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		fmt.Println("cuenta agregada:", alias)
+	case "list":
+		if err := runList(); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+	case "status":
+		if err := runStatus(); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "comando desconocido: %s\n", cmd)
 		printUsage()
 		os.Exit(1)
 	}
-	_ = args
 }
 
 func printUsage() {
