@@ -1,6 +1,7 @@
 package serviceloop
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/uaigasp/ccswitch/internal/accounts"
@@ -28,17 +29,20 @@ func (f realUsageFetcher) Fetch(accessToken string) (float64, error) {
 
 func RunOnce(dir, credPath string, cfg config.Config, lastSwitch time.Time, dryRun bool) (autoswitch.Decision, error) {
 	fetcher := realUsageFetcher{client: usage.NewClient()}
-	decision, err := runOnceWithFetcher(dir, fetcher, cfg, lastSwitch, dryRun)
+	return doRunOnce(dir, credPath, fetcher, cfg, lastSwitch, dryRun)
+}
+
+func doRunOnce(dir, credPath string, fetcher usageFetcher, cfg config.Config, lastSwitch time.Time, dryRun bool) (autoswitch.Decision, error) {
+	decision, store, err := runOnceWithFetcher(dir, fetcher, cfg, lastSwitch, dryRun)
 	if err != nil {
 		return autoswitch.Decision{}, err
 	}
 
 	if decision.ShouldSwitch && !dryRun {
-		store, err := accounts.Load(dir)
-		if err != nil {
-			return decision, err
+		target, ok := store.Get(decision.TargetAlias)
+		if !ok {
+			return decision, fmt.Errorf("la cuenta %q ya no existe en el store", decision.TargetAlias)
 		}
-		target, _ := store.Get(decision.TargetAlias)
 		if err := swap.WriteActive(credPath, target.OAuth); err != nil {
 			return decision, err
 		}
@@ -51,24 +55,24 @@ func RunOnce(dir, credPath string, cfg config.Config, lastSwitch time.Time, dryR
 	return decision, nil
 }
 
-func runOnceWithFetcher(dir string, fetcher usageFetcher, cfg config.Config, lastSwitch time.Time, dryRun bool) (autoswitch.Decision, error) {
+func runOnceWithFetcher(dir string, fetcher usageFetcher, cfg config.Config, lastSwitch time.Time, dryRun bool) (autoswitch.Decision, accounts.Store, error) {
 	store, err := accounts.Load(dir)
 	if err != nil {
-		return autoswitch.Decision{}, err
+		return autoswitch.Decision{}, accounts.Store{}, err
 	}
 
 	if store.Active == "" || len(store.Accounts) < 2 {
-		return autoswitch.Decision{}, nil
+		return autoswitch.Decision{}, store, nil
 	}
 
 	active, ok := store.Get(store.Active)
 	if !ok {
-		return autoswitch.Decision{}, nil
+		return autoswitch.Decision{}, store, nil
 	}
 
 	activePct, err := fetcher.Fetch(active.OAuth.AccessToken)
 	if err != nil {
-		return autoswitch.Decision{}, err
+		return autoswitch.Decision{}, accounts.Store{}, err
 	}
 
 	candidates := map[string]float64{}
@@ -83,5 +87,5 @@ func runOnceWithFetcher(dir string, fetcher usageFetcher, cfg config.Config, las
 		candidates[a.Alias] = pct
 	}
 
-	return autoswitch.Evaluate(activePct, candidates, cfg.ThresholdPercent, lastSwitch, time.Now(), cfg.CooldownSeconds), nil
+	return autoswitch.Evaluate(activePct, candidates, cfg.ThresholdPercent, lastSwitch, time.Now(), cfg.CooldownSeconds), store, nil
 }
