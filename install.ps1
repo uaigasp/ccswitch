@@ -18,11 +18,9 @@ Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath
 
 Write-Host "agregando $installDir al PATH del usuario..."
 $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if (-not $currentPath) {
-    $currentPath = ""
-}
 if ($currentPath -notlike "*$installDir*") {
-    [Environment]::SetEnvironmentVariable("Path", "$currentPath;$installDir", "User")
+    $newPath = if ($currentPath) { "$currentPath;$installDir" } else { $installDir }
+    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
 }
 
 Write-Host ""
