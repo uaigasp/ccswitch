@@ -31,7 +31,7 @@ func Load(dir string) (Config, error) {
 		return Config{}, err
 	}
 
-	var c Config
+	c := Default()
 	if err := json.Unmarshal(data, &c); err != nil {
 		return Config{}, err
 	}

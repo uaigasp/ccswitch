@@ -33,6 +33,15 @@ func TestEvaluateNoSwitchWithoutCandidates(t *testing.T) {
 	}
 }
 
+func TestEvaluateNoSwitchWhenCandidatesNotBetter(t *testing.T) {
+	now := time.Now()
+	candidates := map[string]float64{"a": 98, "b": 99}
+	d := Evaluate(98, candidates, 90, time.Time{}, now, 300)
+	if d.ShouldSwitch {
+		t.Fatal("no deberia cambiar si ningun candidato mejora a la cuenta activa")
+	}
+}
+
 func TestEvaluateRespectsCooldown(t *testing.T) {
 	now := time.Now()
 	lastSwitch := now.Add(-1 * time.Minute)

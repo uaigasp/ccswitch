@@ -84,5 +84,9 @@ func Save(dir string, s Store) error {
 	}
 
 	path := filepath.Join(dir, "accounts.json")
-	return os.WriteFile(path, data, 0o600)
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }

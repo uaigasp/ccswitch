@@ -38,5 +38,9 @@ func Evaluate(
 		return Decision{}
 	}
 
+	if bestPct >= activeFiveHourPct {
+		return Decision{}
+	}
+
 	return Decision{ShouldSwitch: true, TargetAlias: bestAlias}
 }
