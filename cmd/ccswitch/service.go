@@ -42,10 +42,11 @@ func (p *program) loop() {
 	}
 
 	logFile, err := os.OpenFile(filepath.Join(dir, "ccswitch.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err == nil {
-		log.SetOutput(logFile)
-		defer logFile.Close()
+	if err != nil {
+		return
 	}
+	log.SetOutput(logFile)
+	defer logFile.Close()
 
 	var lastSwitch time.Time
 
@@ -84,6 +85,7 @@ func serviceConfig() *service.Config {
 		Name:        "ccswitch",
 		DisplayName: "ccswitch auto-switch",
 		Description: "cambia entre cuentas de claude code cuando el uso se acerca al limite",
+		Arguments:   []string{"service", "run"},
 	}
 }
 
